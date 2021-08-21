@@ -25,7 +25,7 @@ client = GithubConfig().get_client()
 repo_name = "caradvice/drive-boot"
 repo = client.get_repo(repo_name)
 
-def create_release(*args):
+def git_create_release(*args):
     release = get_last_release()
     pulls = []
     if not release:
@@ -86,8 +86,8 @@ def get_last_release(*args):
 
 
 if len(sys.argv) > 1:
-    create_release(sys.argv[1])
+    git_create_release(sys.argv[1])
 else:
-    create_release(None)
+    git_create_release(None)
 
 exit(0)
