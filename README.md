@@ -1,1 +1,1 @@
-# raycast-commands
+# raycast-aws
