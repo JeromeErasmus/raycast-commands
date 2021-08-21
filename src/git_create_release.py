@@ -18,16 +18,22 @@
 import sys
 import re
 import json
-from core.config import GithubConfig
+from core.config import CommandsConfig
 from datetime import datetime
 
-client = GithubConfig().get_client()
+github_client = CommandsConfig().github_client()
+jira_client = CommandsConfig().jira_client()
 repo_name = "caradvice/drive-boot"
-repo = client.get_repo(repo_name)
+repo_name = "caradvice/drive-boot"
 
-def git_create_release(*args):
+def main(*args):
     release = get_last_release()
     pulls = []
+
+    issue = jira_client.issue('JRA-1330')
+    print(issue)
+    exit(0)
+
     if not release:
         print('Error. Previous release not found')
         return False
@@ -73,10 +79,11 @@ def get_jira_ticket():
 def search_issues(release):
     date = release.published_at.strftime('%Y-%m-%dT%H:%M:%S')
     query = 'repo:{0} type:pr merged:>{1}'.format(repo_name, date)
-    return client.search_issues(query=query)
+    return github_client.search_issues(query=query)
 
 
 def get_last_release(*args):
+    repo = github_client.get_repo(repo_name)
     repos = repo.get_releases()
 
     if repos and repos[0]:
@@ -86,8 +93,8 @@ def get_last_release(*args):
 
 
 if len(sys.argv) > 1:
-    git_create_release(sys.argv[1])
+    main(sys.argv[1])
 else:
-    git_create_release(None)
+    main(None)
 
 exit(0)
