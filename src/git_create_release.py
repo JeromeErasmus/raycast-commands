@@ -217,7 +217,7 @@ def create_release(last_release, notes):
         if release:
             print(Fontcol.YELLOW, '\nRelase Name: {0}'.format(name))
             print(Fontcol.YELLOW, '\nTag: {0}'.format(tag))
-            print('\nUrl: {0}'.format(last_release.html_url))
+            print('\nUrl: {0}'.format(release.html_url))
             print(Fontcol.WHITE, '\n{0}\n{1}'.format('-'*10, notes))
     except GithubException as error:
         print(error)
