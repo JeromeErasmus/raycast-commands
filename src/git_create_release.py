@@ -27,6 +27,7 @@ from github import GithubException
 github_client = CommandsConfig().get_github_client()
 jira_client = CommandsConfig().get_jira_client()
 repo_name = "caradvice/drive-boot"
+repo_branch = "main"
 
 
 def main(*args):
@@ -165,28 +166,43 @@ def get_last_release(*args):
     return False
 
 
+def get_branch_head():
+    try:
+        branch = github_client.get_repo(repo_name).get_branch(repo_branch)
+        return branch
+    except GithubException as error:
+        print(error)
+    
+    return False
+    
+
+
 def create_release(last_release, notes):
     if not last_release:
         print('Error. Last release not found')
         return False
-    repo = github_client.get_repo(repo_name)
-    tag = last_release.tag_name
     
-    m = int(tag[tag.rfind('.')+1:]) + 1
-    t = tag[:tag.rfind('.')+1] + str(m)
-    name = "{0}-{1}".format(t, datetime.today().strftime('%Y-%m-%d'))
-    print(name)
-    # try:
-    #     release = repo.create_git_release(
-    #         tag=t,
-    #         name="{0}".format(t, ),
-    #         prerelease=True,
-    #         message=notes,
-    #         target_commitish=''
-    #     )
-    # except GithubException as error:
-    #     print(error)
-    #     return False
+    branch = get_branch_head()
+    if not get_branch_head():
+        print("Error. Specified branch not found".format(repo_branch))
+        return False
+
+    last_tag = last_release.tag_name
+    m = int(last_tag[last_tag.rfind('.')+1:]) + 1
+    tag = last_tag[:last_tag.rfind('.')+1] + str(m)
+    name = "{0}-{1}".format(tag, datetime.today().strftime('%Y-%m-%d'))
+    
+    try:
+        release = repo.create_git_release(
+            tag=tag,
+            name=name,
+            prerelease=True,
+            message=notes,
+            target_commitish=branch.commit.sha
+        )
+    except GithubException as error:
+        print(error)
+        return False
     
 
 if len(sys.argv) > 1:
