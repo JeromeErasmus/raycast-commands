@@ -22,6 +22,7 @@ from core.config import CommandsConfig
 from datetime import datetime
 from itertools import groupby
 from jira import JIRA, JIRAError
+from github import GithubException
 
 github_client = CommandsConfig().get_github_client()
 jira_client = CommandsConfig().get_jira_client()
@@ -29,20 +30,20 @@ repo_name = "caradvice/drive-boot"
 
 
 def main(*args):
-    release = get_last_release()
+    last_release = get_last_release()
 
-    if not release:
+    if not last_release:
         print('Error. Previous release not found')
         return False
 
-    if release.prerelease:
+    if last_release.prerelease:
         print('Previous release is a PreRelease. Publish the previous release')
         return False
 
-    issues = create_issues_list(release)
+    issues = create_issues_list(last_release)
     grouped_issues = group_issues_list(issues)
-    print(json.dumps(grouped_issues))
-    
+    notes = format_notes(grouped_issues)
+    create_release(last_release, notes)
 
 def create_issues_list(release):
     issues = []
@@ -75,16 +76,35 @@ def group_issues_list(issues):
         
         if not jira_issue:
             issue['valid_issue'] = False
-            summary = []
-            for child in issue['children']:
-                summary.append(child['lable_name'])
-
-            issue['issue_summary'] = ', '.join(summary)
         else:
             issue['valid_issue'] = True
             issue['issue_summary'] = jira_issue.fields.summary
 
     return grouped
+
+def format_notes(issues):
+    notes = []
+    for key in issues:
+        issue = issues[key]
+        
+        summary = []
+        numbers = []
+        for child in issue['children']:
+            numbers.append(str(child['number']))
+        
+        if not issue['valid_issue']:
+            for child in issue['children']:
+                summary.append(child['lable_name'])
+        else:
+            summary = [issue['issue_summary']]
+        
+        notes.append("#{0} [{1}] {2} \n\r".format(
+            ' #'.join(numbers),
+            issue['ticket_key'],
+            ', '.join(summary),
+            )
+        )
+    return ''.join(notes)
 
 
 def get_jira_issue(ticket_key):
@@ -96,6 +116,7 @@ def get_jira_issue(ticket_key):
         pass
 
     return None
+
 
 def extract_ticket(string):
     ticket_label = re.search(r"(?<=\[)(.*?)(?=\])", string)
@@ -115,29 +136,58 @@ def extract_lable(string):
         return ''
 
 
-def get_jira_ticket():
-    pass
-
-
 def search_issues(release):
     date = release.published_at.strftime('%Y-%m-%dT%H:%M:%S')
     query = 'repo:{0} type:pr merged:>{1}'.format(repo_name, date)
-    return github_client.search_issues(query=query)
+    
+    try:
+        result = github_client.search_issues(query=query)
+        return result
+    except GithubException as error:
+        print(error)
 
+    return False
 
 def sort_key_func(k):
     return k['ticket_key']
 
 
 def get_last_release(*args):
-    repo = github_client.get_repo(repo_name)
-    repos = repo.get_releases()
+    try:
+        repo = github_client.get_repo(repo_name)
+        releases = repo.get_releases()
 
-    if repos and repos[0]:
-        return repos[0]
-
+        if releases and releases[0]:
+            return releases[0]
+    except GithubException as error:
+        print(error)
+    
     return False
 
+
+def create_release(last_release, notes):
+    if not last_release:
+        print('Error. Last release not found')
+        return False
+    repo = github_client.get_repo(repo_name)
+    tag = last_release.tag_name
+    
+    m = int(tag[tag.rfind('.')+1:]) + 1
+    t = tag[:tag.rfind('.')+1] + str(m)
+    name = "{0}-{1}".format(t, datetime.today().strftime('%Y-%m-%d'))
+    print(name)
+    # try:
+    #     release = repo.create_git_release(
+    #         tag=t,
+    #         name="{0}".format(t, ),
+    #         prerelease=True,
+    #         message=notes,
+    #         target_commitish=''
+    #     )
+    # except GithubException as error:
+    #     print(error)
+    #     return False
+    
 
 if len(sys.argv) > 1:
     main(sys.argv[1])
