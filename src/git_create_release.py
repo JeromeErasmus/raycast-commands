@@ -28,7 +28,7 @@ github_client = CommandsConfig().get_github_client()
 jira_client = CommandsConfig().get_jira_client()
 repo_name = "caradvice/drive-boot"
 repo_branch = "main"
-
+repo = github_client.get_repo(repo_name)
 
 def main(*args):
     last_release = get_last_release()
@@ -153,11 +153,9 @@ def sort_key_func(k):
     return k['ticket_key']
 
 
-def get_last_release(*args):
+def get_last_release():
     try:
-        repo = github_client.get_repo(repo_name)
         releases = repo.get_releases()
-
         if releases and releases[0]:
             return releases[0]
     except GithubException as error:
@@ -168,7 +166,7 @@ def get_last_release(*args):
 
 def get_branch_head():
     try:
-        branch = github_client.get_repo(repo_name).get_branch(repo_branch)
+        branch = repo.get_branch(repo_branch)
         return branch
     except GithubException as error:
         print(error)
