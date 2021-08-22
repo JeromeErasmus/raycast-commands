@@ -8,7 +8,8 @@
 
 # Optional parameters:
 # @raycast.icon ''
-# @raycast.argument1 { "type": "text", "placeholder": "parameter key", "optional": false}
+# @raycast.argument1 { "type": "text", "placeholder": "repository", "optional": true}
+# @raycast.argument2 { "type": "text", "placeholder": "branch", "optional": true}
 
 # Documentation:
 # @raycast.description Github Create Release
@@ -24,13 +25,20 @@ from itertools import groupby
 from jira import JIRA, JIRAError
 from github import GithubException
 
-github_client = CommandsConfig().get_github_client()
-jira_client = CommandsConfig().get_jira_client()
-repo_name = "caradvice/drive-boot"
-repo_branch = "main"
-repo = github_client.get_repo(repo_name)
+config = None
+github_client = None
+jira_client = None
+repo = None
+
 
 def main(*args):
+    global config, github_client, jira_client, repo
+
+    config = CommandsConfig(repository=args[0], branch=args[1])
+    github_client = config.get_github_client()
+    jira_client = config.get_jira_client()
+  
+    repo = get_repository()
     last_release = get_last_release()
 
     if not last_release:
@@ -139,7 +147,7 @@ def extract_lable(string):
 
 def search_issues(release):
     date = release.published_at.strftime('%Y-%m-%dT%H:%M:%S')
-    query = 'repo:{0} type:pr merged:>{1}'.format(repo_name, date)
+    query = 'repo:{0} type:pr merged:>{1}'.format(config.github_repo, date)
     
     try:
         result = github_client.search_issues(query=query)
@@ -152,6 +160,17 @@ def search_issues(release):
 def sort_key_func(k):
     return k['ticket_key']
 
+
+def get_repository():
+    
+    try:
+        repo = github_client.get_repo(config.github_repo)
+        if repo:
+            return repo
+    except GithubException as error:
+        print(error)
+    
+    return False
 
 def get_last_release():
     try:
@@ -166,7 +185,7 @@ def get_last_release():
 
 def get_branch_head():
     try:
-        branch = repo.get_branch(repo_branch)
+        branch = repo.get_branch(config.github_branch)
         return branch
     except GithubException as error:
         print(error)
@@ -182,7 +201,7 @@ def create_release(last_release, notes):
     
     branch = get_branch_head()
     if not get_branch_head():
-        print("Error. Specified branch not found".format(repo_branch))
+        print("Error. Specified branch not found".format(config.github_branch))
         return False
 
     last_tag = last_release.tag_name
@@ -190,22 +209,23 @@ def create_release(last_release, notes):
     tag = last_tag[:last_tag.rfind('.')+1] + str(m)
     name = "{0}-{1}".format(tag, datetime.today().strftime('%Y-%m-%d'))
     
-    try:
-        release = repo.create_git_release(
-            tag=tag,
-            name=name,
-            prerelease=True,
-            message=notes,
-            target_commitish=branch.commit.sha
-        )
-    except GithubException as error:
-        print(error)
-        return False
+    print(branch)
+    # try:
+    #     release = repo.create_git_release(
+    #         tag=tag,
+    #         name=name,
+    #         prerelease=True,
+    #         message=notes,
+    #         target_commitish=branch
+    #     )
+    # except GithubException as error:
+    #     print(error)
+    #     return False
     
 
 if len(sys.argv) > 1:
-    main(sys.argv[1])
+    main(sys.argv[1], sys.argv[2])
 else:
-    main(None)
+    print('Error. Invalid argumnet count')
 
 exit(0)
