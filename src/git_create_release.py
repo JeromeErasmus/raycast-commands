@@ -20,19 +20,16 @@ import re
 import json
 from core.config import CommandsConfig
 from datetime import datetime
+from itertools import groupby
+from jira import JIRA, JIRAError
 
-github_client = CommandsConfig().github_client()
-jira_client = CommandsConfig().jira_client()
+github_client = CommandsConfig().get_github_client()
+jira_client = CommandsConfig().get_jira_client()
 repo_name = "caradvice/drive-boot"
-repo_name = "caradvice/drive-boot"
+
 
 def main(*args):
     release = get_last_release()
-    pulls = []
-
-    issue = jira_client.issue('JRA-1330')
-    print(issue)
-    exit(0)
 
     if not release:
         print('Error. Previous release not found')
@@ -42,26 +39,71 @@ def main(*args):
         print('Previous release is a PreRelease. Publish the previous release')
         return False
 
-    for issue in search_issues(release):
-        ticket_name = extract_ticket(issue.title)
-        lable_name = extract_lable(issue.title)
-        pulls.append(dict(
-            issue=issue.number,
-            title=issue.title,
-            ticket_name=ticket_name,
-            lable_name=lable_name
-            ))
+    issues = create_issues_list(release)
+    grouped_issues = group_issues_list(issues)
+    print(json.dumps(grouped_issues))
     
-    print(json.dumps(pulls))
 
+def create_issues_list(release):
+    issues = []
+    
+    for issue in search_issues(release):
+        ticket_key = extract_ticket(issue.title)
+        lable_name = extract_lable(issue.title)
+
+        issues.append(dict(
+            number=issue.number,
+            title=issue.title,
+            ticket_key=ticket_key,
+            lable_name=lable_name,
+        ))
+
+    return issues
+
+
+def group_issues_list(issues):
+    sorted_issues = sorted(issues, key=sort_key_func)
+    grouped = dict()
+
+    for key, value in groupby(sorted_issues, sort_key_func):
+        grouped[key] = dict(children=list(value), ticket_key=key)
+    
+    for key in grouped:
+        issue = grouped[key]
+        
+        jira_issue = get_jira_issue(issue['ticket_key'])
+        
+        if not jira_issue:
+            issue['valid_issue'] = False
+            summary = []
+            for child in issue['children']:
+                summary.append(child['lable_name'])
+
+            issue['issue_summary'] = ', '.join(summary)
+        else:
+            issue['valid_issue'] = True
+            issue['issue_summary'] = jira_issue.fields.summary
+
+    return grouped
+
+
+def get_jira_issue(ticket_key):
+    try:
+        issue = jira_client.issue(ticket_key)
+        if issue:
+            return issue
+    except JIRAError as error:
+        pass
+
+    return None
 
 def extract_ticket(string):
     ticket_label = re.search(r"(?<=\[)(.*?)(?=\])", string)
-    
+
     if ticket_label:
-        return ticket_label.group(0)
+        return ticket_label.group(0).lstrip().rstrip()
     else:
-        return None
+        return ''
 
 
 def extract_lable(string):
@@ -70,16 +112,21 @@ def extract_lable(string):
     if index != -1:
         return string[index+1:].lstrip().capitalize()
     else:
-        return None
+        return ''
 
 
 def get_jira_ticket():
-    pass     
-    
+    pass
+
+
 def search_issues(release):
     date = release.published_at.strftime('%Y-%m-%dT%H:%M:%S')
     query = 'repo:{0} type:pr merged:>{1}'.format(repo_name, date)
     return github_client.search_issues(query=query)
+
+
+def sort_key_func(k):
+    return k['ticket_key']
 
 
 def get_last_release(*args):
