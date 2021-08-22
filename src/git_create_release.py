@@ -24,6 +24,7 @@ from datetime import datetime
 from itertools import groupby
 from jira import JIRA, JIRAError
 from github import GithubException
+from core.functions import Functions, Fontcol
 
 config = None
 github_client = None
@@ -199,28 +200,28 @@ def create_release(last_release, notes):
         print('Error. Last release not found')
         return False
     
-    branch = get_branch_head()
-    if not get_branch_head():
-        print("Error. Specified branch not found".format(config.github_branch))
-        return False
-
     last_tag = last_release.tag_name
     m = int(last_tag[last_tag.rfind('.')+1:]) + 1
     tag = last_tag[:last_tag.rfind('.')+1] + str(m)
     name = "{0}-{1}".format(tag, datetime.today().strftime('%Y-%m-%d'))
     
-    print(branch)
-    # try:
-    #     release = repo.create_git_release(
-    #         tag=tag,
-    #         name=name,
-    #         prerelease=True,
-    #         message=notes,
-    #         target_commitish=branch
-    #     )
-    # except GithubException as error:
-    #     print(error)
-    #     return False
+    try:
+        release = repo.create_git_release(
+            tag=tag,
+            name=name,
+            prerelease=True,
+            message=notes,
+            target_commitish=config.github_branch
+        )
+
+        if release:
+            print(Fontcol.YELLOW, '\nRelase Name: {0}'.format(name))
+            print(Fontcol.YELLOW, '\nTag: {0}'.format(tag))
+            print('\nUrl: {0}'.format(last_release.html_url))
+            print(Fontcol.WHITE, '\n{0}\n{1}'.format('-'*10, notes))
+    except GithubException as error:
+        print(error)
+        return False
     
 
 if len(sys.argv) > 1:

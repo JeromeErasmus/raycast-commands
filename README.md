@@ -16,3 +16,12 @@
 
 ## install Python dependancies 
 1. Run `pip install -r requirements.txt` in the root directory
+
+
+## Using Virtual Environmnet 
+
+Start Virtual Environment with the below:
+`source env/bin/activate`
+
+End Virtual Environment with the below:
+`deactive`
