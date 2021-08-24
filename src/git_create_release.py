@@ -204,7 +204,7 @@ def create_release(last_release, notes):
     m = int(last_tag[last_tag.rfind('.')+1:]) + 1
     tag = last_tag[:last_tag.rfind('.')+1] + str(m)
     name = "{0}-{1}".format(tag, datetime.today().strftime('%Y-%m-%d'))
-    
+
     try:
         release = repo.create_git_release(
             tag=tag,
@@ -215,9 +215,8 @@ def create_release(last_release, notes):
         )
 
         if release:
-            print(Fontcol.YELLOW, '\nRelase Name: {0}'.format(name))
-            print(Fontcol.YELLOW, '\nTag: {0}'.format(tag))
-            print('\nUrl: {0}'.format(release.html_url))
+            print(Fontcol.YELLOW, 'Version: {0}'.format(name))
+            print('Url: {0}'.format(release.html_url))
             print(Fontcol.WHITE, '\n{0}\n{1}'.format('-'*10, notes))
     except GithubException as error:
         print(error)
